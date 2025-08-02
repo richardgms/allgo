@@ -22,10 +22,12 @@ npm run typecheck       # TypeScript validation
 npm run test            # Run test suite
 npm run test:watch      # Run tests in watch mode
 
-# Database (Supabase)
+# Database (Prisma + Supabase)
 npm run db:push         # Push schema changes (development)
 npm run db:migrate      # Run migrations (production)
 npm run db:seed         # Seed database with test data
+npx prisma generate     # Generate Prisma client
+npx prisma studio       # Open Prisma Studio
 ```
 
 ## Core Architecture
@@ -46,11 +48,13 @@ npm run db:seed         # Seed database with test data
 /api/admin/*               # Protected admin APIs
 ```
 
-### Database Patterns
+### Database Patterns (Prisma ORM)
 - **Cascade Relationships**: Restaurant → Categories → Products (CASCADE delete)
-- **Protect References**: Product references in OrderItems (RESTRICT delete)
-- **Multi-tenant Filtering**: Always include `restaurantId` in queries
+- **Protect References**: Product references in OrderItems (RESTRICT delete) 
+- **Multi-tenant Filtering**: Always include `restaurantId` in Prisma queries
 - **Variation System**: Products have Groups (size, flavor) → Options (individual pricing)
+- **Type Safety**: Full TypeScript integration with Prisma Client
+- **Schema-first**: Database schema defined in `prisma/schema.prisma`
 
 ### Authentication Flow
 - JWT with refresh tokens stored in localStorage
@@ -86,17 +90,25 @@ npm run db:seed         # Seed database with test data
 - **React Query**: Server state with automatic caching/sync
 - **Local useState**: Component-only temporary state
 
-### API Design
+### API Design (Prisma)
 ```typescript
 // Always validate restaurant access
 const authUser = await getAuthUser(request)
 await validateRestaurantAccess(authUser.profileId, restaurantSlug)
 
-// Always filter by restaurant
-const products = await db.product.findMany({
+// Always filter by restaurant using Prisma
+const products = await prisma.product.findMany({
   where: { 
     restaurantId,
     category: { restaurantId } // Related data must also belong to restaurant
+  },
+  include: {
+    category: true,
+    variationGroups: {
+      include: {
+        options: true
+      }
+    }
   }
 })
 ```

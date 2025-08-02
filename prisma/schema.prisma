@@ -1,0 +1,277 @@
+// AllGoMenu - Multi-tenant Restaurant Delivery Platform
+// Prisma Schema for PostgreSQL (Supabase)
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== USER MANAGEMENT =====
+model Profile {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  restaurants Restaurant[]
+
+  @@map("profiles")
+}
+
+// ===== RESTAURANT MANAGEMENT =====
+model Restaurant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  phone       String
+  email       String?
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  
+  // PIX Configuration
+  pixKey      String?
+  pixKeyType  String? // CPF, CNPJ, EMAIL, PHONE, RANDOM
+  
+  // Theme Configuration
+  primaryColor   String @default("#3B82F6")
+  secondaryColor String @default("#10B981")
+  
+  // Settings
+  isActive      Boolean  @default(true)
+  deliveryFee   Decimal  @default(0) @db.Decimal(10, 2)
+  minOrder      Decimal  @default(0) @db.Decimal(10, 2)
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  ownerId    String
+  owner      Profile    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  categories Category[]
+  products   Product[]
+  orders     Order[]
+
+  @@map("restaurants")
+}
+
+// ===== MENU MANAGEMENT =====
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+  
+  // Multi-tenant
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  products Product[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  imageUrl    String?
+  isActive    Boolean @default(true)
+  isFeatured  Boolean @default(false)
+  sortOrder   Int     @default(0)
+  
+  // Multi-tenant
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Category
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  variationGroups VariationGroup[]
+  orderItems      OrderItem[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+// ===== PRODUCT VARIATIONS =====
+model VariationGroup {
+  id       String  @id @default(cuid())
+  name     String  // "Tamanho", "Sabor", "Complementos"
+  required Boolean @default(false)
+  multiple Boolean @default(false) // Allow multiple selections
+  minSelections Int @default(0)
+  maxSelections Int?
+  sortOrder Int  @default(0)
+  
+  // Multi-tenant (through product)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  options VariationOption[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("variation_groups")
+}
+
+model VariationOption {
+  id          String  @id @default(cuid())
+  name        String  // "Pequena", "Média", "Grande"
+  priceChange Decimal @default(0) @db.Decimal(10, 2) // +/- price modification
+  isDefault   Boolean @default(false)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+  
+  // Group relationship
+  variationGroupId String
+  variationGroup   VariationGroup @relation(fields: [variationGroupId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  orderItemOptions OrderItemOption[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("variation_options")
+}
+
+// ===== ORDER MANAGEMENT =====
+model Order {
+  id           String      @id @default(cuid())
+  orderNumber  String      @unique // User-friendly order number
+  status       OrderStatus @default(PENDING)
+  
+  // Customer Information
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  
+  // Delivery Information
+  deliveryAddress String?
+  deliveryMethod  DeliveryMethod @default(DELIVERY)
+  
+  // Payment Information
+  paymentMethod PaymentMethod @default(PIX)
+  paymentStatus PaymentStatus @default(PENDING)
+  
+  // Order Totals
+  subtotal    Decimal @db.Decimal(10, 2)
+  deliveryFee Decimal @default(0) @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+  
+  // PIX Information
+  pixPayload  String? // BR Code for PIX payment
+  pixExpiresAt DateTime?
+  
+  // Multi-tenant
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  items OrderItem[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  quantity Int     @default(1)
+  unitPrice Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes    String?
+  
+  // Product relationship
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  
+  // Order relationship
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Relationships
+  selectedOptions OrderItemOption[]
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("order_items")
+}
+
+model OrderItemOption {
+  id String @id @default(cuid())
+  
+  // Order Item relationship
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  
+  // Variation Option relationship
+  variationOptionId String
+  variationOption   VariationOption @relation(fields: [variationOptionId], references: [id], onDelete: Restrict)
+  
+  // Metadata
+  createdAt DateTime @default(now())
+  
+  @@unique([orderItemId, variationOptionId])
+  @@map("order_item_options")
+}
+
+// ===== ENUMS =====
+enum OrderStatus {
+  PENDING       // Awaiting payment confirmation
+  CONFIRMED     // Payment confirmed, order accepted
+  PREPARING     // Kitchen preparing the order
+  READY         // Order ready for pickup/delivery
+  OUT_FOR_DELIVERY // Order out for delivery
+  DELIVERED     // Order completed
+  CANCELLED     // Order cancelled
+}
+
+enum DeliveryMethod {
+  DELIVERY      // Home delivery
+  PICKUP        // Customer pickup
+}
+
+enum PaymentMethod {
+  PIX           // PIX payment
+  CASH          // Cash on delivery
+  CARD          // Card on delivery
+}
+
+enum PaymentStatus {
+  PENDING       // Awaiting payment
+  PAID          // Payment confirmed
+  FAILED        // Payment failed
+  REFUNDED      // Payment refunded
+}

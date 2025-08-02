@@ -1,0 +1,21 @@
+O agente vai obter a referência de um arquivo ou o nome do que deseja construir.
+Em seguida, estas são as regras:
+
+Regra de Uso
+Quando for solicitado o uso de componentes shadcn, utilize o servidor MCP.
+
+Regra de Planejamento
+Ao planejar algo relacionado ao shadcn:
+
+Use o servidor MCP durante o planejamento
+
+Aplique componentes sempre que for possível utilizá-los
+
+Use blocos completos sempre que possível (ex.: página de login, calendário)
+
+Regra de Implementação
+Ao implementar:
+
+Primeiro, utilize a ferramenta de demonstração (demo tool) para ver como o componente é usado
+
+Em seguida, implemente corretamente com base nesse exemplo
